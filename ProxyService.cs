@@ -1,106 +1,111 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.Security;
+using System.Threading.Tasks;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Models;
 
-namespace SucroseProxy;
-internal class ProxyService
+namespace SucroseProxy
 {
-    string[] address = File.ReadAllLines("./address.txt");
-
-    private static readonly string[] s_redirectDomains =
+    internal class ProxyService
     {
-        ".yuanshen.com",
-        ".hoyoverse.com",
-        ".mihoyo.com",
-        ".yuanshen.com:12401",
-        ".zenlesszonezero.com",
-        ".honkaiimpact3.com",
-        ".bhsr.com",
-        ".starrails.com",
-        ".kurogame.net",
-        ".kurogame-service.com",
-        ".kurogame.com",
-        ".g3.proletariat.com",
-        ".honkaiimpact3.com",
-        ".bh3.com"
-    };
-
-    private readonly ProxyServer _server;
-
-    public ProxyService()
-    {
-        _server = new ProxyServer();
-        _server.CertificateManager.EnsureRootCertificate();
-
-        _server.BeforeRequest += BeforeRequest;
-        _server.ServerCertificateValidationCallback += OnCertValidation;
-
-        ExplicitProxyEndPoint endPoint = new(IPAddress.Any, 8080, true);
-        endPoint.BeforeTunnelConnectRequest += BeforeTunnelConnectRequest;
-
-        _server.AddEndPoint(endPoint);
-        _server.Start();
-
-        _server.SetAsSystemHttpProxy(endPoint);
-        _server.SetAsSystemHttpsProxy(endPoint);
-    }
-
-    public void Shutdown()
-    {
-        _server.Stop();
-        _server.Dispose();
-    }
-
-    private Task BeforeTunnelConnectRequest(object sender, TunnelConnectSessionEventArgs args)
-    {
-        string hostname = args.HttpClient.Request.RequestUri.Host;
-        args.DecryptSsl = ShouldRedirect(hostname);
-
-        return Task.CompletedTask;
-    }
-
-    private Task OnCertValidation(object sender, CertificateValidationEventArgs args)
-    {
-        if (args.SslPolicyErrors == SslPolicyErrors.None)
+        private static readonly string[] s_redirectDomains =
         {
-            args.IsValid = true;
+            ".hoyoverse.com",
+            ".mihoyo.com",
+            ".bhsr.com",
+            ".starrails.com",
+        };
+
+        private readonly ProxyServer _server;
+        private readonly string[] _address;
+
+        public ProxyService(string[] address)
+        {
+            _address = address;
+
+            _server = new ProxyServer();
+            _server.CertificateManager.EnsureRootCertificate();
+
+            _server.BeforeRequest += BeforeRequest;
+            _server.ServerCertificateValidationCallback += OnCertValidation;
+
+            ExplicitProxyEndPoint endPoint = new(IPAddress.Any, 8080, true);
+            endPoint.BeforeTunnelConnectRequest += BeforeTunnelConnectRequest;
+
+            _server.AddEndPoint(endPoint);
+            _server.Start();
+
+            _server.SetAsSystemHttpProxy(endPoint);
+            _server.SetAsSystemHttpsProxy(endPoint);
         }
 
-        return Task.CompletedTask;
-    }
-
-    private Task BeforeRequest(object sender, SessionEventArgs args)
-    {
-        string hostname = args.HttpClient.Request.RequestUri.Host;
-
-        if (ShouldRedirect(hostname))
+        public void Start()
         {
-            string requestUrl = args.HttpClient.Request.Url;
-
-            Uri local = new($"http://" + address[0] + "/");
-
-            string replacedUrl = new UriBuilder(requestUrl) { Scheme = local.Scheme, Host = local.Host, Port = local.Port }.Uri.ToString();
-
-            args.HttpClient.Request.Url = replacedUrl;
-
-            Console.WriteLine(requestUrl);
+            Console.ReadLine();
         }
 
-        return Task.CompletedTask;
-    }
-
-    private static bool ShouldRedirect(string hostname)
-    {
-        foreach (string domain in s_redirectDomains)
+        public void Shutdown()
         {
-            if (hostname.EndsWith(domain))
+            _server.Stop();
+            _server.Dispose();
+        }
+
+        private Task BeforeTunnelConnectRequest(object sender, TunnelConnectSessionEventArgs args)
+        {
+            string hostname = args.HttpClient.Request.RequestUri.Host;
+            args.DecryptSsl = ShouldRedirect(hostname);
+
+            return Task.CompletedTask;
+        }
+
+        private Task OnCertValidation(object sender, CertificateValidationEventArgs args)
+        {
+            if (args.SslPolicyErrors == SslPolicyErrors.None)
             {
-                return true;
+                args.IsValid = true;
             }
+
+            return Task.CompletedTask;
         }
 
-        return false;
+        private Task BeforeRequest(object sender, SessionEventArgs args)
+        {
+            string hostname = args.HttpClient.Request.RequestUri.Host;
+
+            if (ShouldRedirect(hostname))
+            {
+                string requestUrl = args.HttpClient.Request.Url;
+
+                Uri local = new Uri($"http://{_address[0]}/");
+
+                string replacedUrl = new UriBuilder(requestUrl)
+                {
+                    Scheme = local.Scheme,
+                    Host = local.Host,
+                    Port = local.Port
+                }.Uri.ToString();
+
+                args.HttpClient.Request.Url = replacedUrl;
+
+                Console.WriteLine(requestUrl);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private static bool ShouldRedirect(string hostname)
+        {
+            foreach (string domain in s_redirectDomains)
+            {
+                if (hostname.EndsWith(domain))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 }

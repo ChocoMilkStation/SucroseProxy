@@ -1,50 +1,26 @@
 ﻿using SucroseProxy;
+using System;
+using System.IO;
 
-Console.Title = "SucroseImpact | Proxy";
-Console.ForegroundColor = ConsoleColor.Cyan;
-Console.WriteLine("143 sucrose");
-Console.ResetColor();
-
-if (File.Exists("./address.txt"))
+class Program
 {
-    string mentallilness = File.ReadAllText("./address.txt");
-    if (String.IsNullOrEmpty(mentallilness) || String.IsNullOrWhiteSpace(mentallilness))
+    static void Main(string[] args)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        throw new Exception("Invalid address!");
-    }
+        Console.Title = "SucroseProxy - HSR Only & No .NET runtime needed!";
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("Starting proxy...\nJust say yes when it asks to install a certificate. It's needed to redirect HTTPS.\n\nBy the way, if you close this proxy and you go \"offline\", open proxy settings in windows and disable it.\nSometimes this thing doesn't automatically disable it when closed.");
+        Console.ResetColor();
 
-    string[] address = File.ReadAllLines("./address.txt");
-    if (String.IsNullOrEmpty(address[0]) || String.IsNullOrWhiteSpace(address[0]) || address[0].Any(Char.IsWhiteSpace))
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        throw new Exception("Invalid address!");
-    }
+        string[] address = { "127.0.0.1:21000" };
 
-    try
-    {
-        Uri url = new($"http://" + address[0] + "/");
-    }
-    catch
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        throw;
+        ProxyService service = new ProxyService(address);
+
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            Console.WriteLine("Shutting down...");
+            service.Shutdown();
+        };
+
+        service.Start();
     }
 }
-else
-{
-    StreamWriter addressfile = new StreamWriter("./address.txt");
-    addressfile.WriteLine("127.0.0.1:21000");
-    addressfile.Close();
-    addressfile.Dispose();
-}
-
-ProxyService service = new();
-
-AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-{
-    Console.WriteLine("Shutting down...");
-    service.Shutdown();
-};
-
-Thread.Sleep(-1);
